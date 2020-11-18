@@ -1,6 +1,14 @@
 import numpy as np
 import cv2
 
+def gaussian_kernel(sigma=3, size=3):
+    kernel = np.zeros((size, size))
+    double_sigma_2 = 2 * sigma ** 2
+    for r in range(kernel.shape[0]):
+        for c in range(kernel.shape[1]):
+            kernel[r, c] = (1 / double_sigma_2 * np.pi) * np.exp(-(r ** 2 + c ** 2) / double_sigma_2)
+    return kernel
+
 
 def load_img(filepath):
     img = cv2.imread(filepath)
@@ -79,10 +87,9 @@ def derivative(src):
 
     return Ix - src, Iy - src
 
-def get_M(r, c, src, Ix, Iy):
-    w = get_window(src, r, c)
-    Ix = w * get_window(Ix, r, c)
-    Iy = w * get_window(Iy, r, c)
+def get_M(r, c, src, Ix, Iy, weights):
+    Ix = weights * get_window(Ix, r, c)
+    Iy = weights * get_window(Iy, r, c)
 
     Ix_2 = Ix ** 2
     Iy_2 = Iy ** 2
@@ -96,24 +103,14 @@ def get_M(r, c, src, Ix, Iy):
 def simple_harris(src):
     img = src.astype(np.float)
     response = np.zeros_like(img)
-    Ix, Iy = derivative(img)
+    # Ix, Iy = derivative(img)
+    Ix = cv2.Scharr(src, cv2.CV_64F, 1, 0)
+    Iy = cv2.Scharr(src, cv2.CV_64F, 0, 1)
+    w = gaussian_kernel()
 
     for r in range(src.shape[0]):
         for c in range(src.shape[1]):
-            M = get_M(r, c, img, Ix, Iy)
-            response[r, c] = np.linalg.det(M) / np.trace(M)
+            M = get_M(r, c, img, Ix, Iy, w)
+            response[r, c] = np.linalg.det(M) - (np.trace(M))
 
     return response       
-
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-
-    img = cv2.imread('/home/thinh/code/python/CS231.L11.KHCL/images/council_house.jpg', 0)
-    img = cv2.resize(img, (500 * img.shape[1] // img.shape[0], 500))
-    open('/home/thinh/code/python/CS231.L11.KHCL/images/council_house.jpg')
-    assert(img is not None)
-
-    response = simple_harris(img)
-    print('Finished')
-    plt.imshow(response)
-    plt.show()
